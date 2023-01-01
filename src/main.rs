@@ -120,6 +120,7 @@ fn traversal_recur<'a>(
            
             for id in &node.relation_ids {
 
+                // Ideally we want to control the max number of tasks by using channels.
                 handlers.push(tokio::spawn(traversal_recur(
                     state.clone(),
                     id.to_string(),

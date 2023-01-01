@@ -167,32 +167,20 @@ impl ElasticSearchService {
         let now = Instant::now();
 
         let sem = Arc::new(Semaphore::new(self.parallelism));
-
         let mut handlers: Vec<JoinHandle<_>> = Vec::new();
-        let mut batch: Vec<IndexNode> = Vec::new();
         let mut i = 0;
-        let total_len = nodes.len();
-        let mut b = 1;
-        let mut current_batch = 0;
-        for n in nodes {
-            batch.push(n);
-            if current_batch >= self.batch_size || current_batch >= total_len - 1 {
-                debug!("ElasticSearchService: index_nodes: Processing batch {} with {} nodes. Processed: {}/{}", b, batch.len(), i, total_len);
-                let permit = sem.clone().acquire_owned().await;
-                let client = self.svc.clone();
-                handlers.push(tokio::task::spawn(index(
-                    client,
-                    batch,
-                    permit,
-                    self.index_name.clone(),
-                )));
+        for batch in nodes.chunks(self.batch_size) {
 
-                batch = vec![];
-                b += 1;
-                current_batch = 0;
-            }
+            debug!("ElasticSearchService: index_nodes: Processing batch {} with {} nodes", i, batch.len());
+            let permit = sem.clone().acquire_owned().await;
+            let client = self.svc.clone();
+            handlers.push(tokio::task::spawn(index(
+                client,
+                batch.to_vec(),
+                permit,
+                self.index_name.clone(),
+            )));
             i += 1;
-            current_batch += 1;
         }
 
         info!(
